@@ -1,7 +1,7 @@
 import collections
 import itertools
 import random
-
+import copy
 import lm_eval.metrics
 import lm_eval.models
 import lm_eval.tasks
@@ -106,6 +106,8 @@ def simple_evaluate(
 
     if check_integrity:
         run_task_tests(task_list=tasks)
+    fname = ''.join(e for e in model_args if e.isalnum()) if isinstance(model, str) else 'default'
+    fname = fname + 'fewshot' + str(num_fewshot)
 
     results = evaluate(
         lm=lm,
@@ -117,6 +119,7 @@ def simple_evaluate(
         decontamination_ngrams_path=decontamination_ngrams_path,
         write_out=write_out,
         output_base_path=output_base_path,
+        file_name=fname,
     )
 
     # add info about the model and few shot config
@@ -158,6 +161,7 @@ def evaluate(
     decontamination_ngrams_path=None,
     write_out=False,
     output_base_path=None,
+    file_name=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -186,6 +190,33 @@ def evaluate(
 
     # TODO: todo: implement proper description-providing system
     assert not provide_description  # not implemented.
+    DIR = 'hostvm/logs/meta-llama'
+
+    correct_exp_loglikelihoods_fname=DIR+file_name+'_correct_likelihoods.txt'
+    correct_exp_loglikelihoods_f=open(correct_exp_loglikelihoods_fname,'w') 
+    a_loglikelihoods_fname=DIR+file_name+'_a_likelihoods.txt'
+    a_loglikelihoods_f=open(a_loglikelihoods_fname,'w')
+    b_loglikelihoods_fname=DIR+file_name+'_b_likelihoods.txt'
+    b_loglikelihoods_f=open(b_loglikelihoods_fname,'w')
+    c_loglikelihoods_fname=DIR+file_name+'_c_likelihoods.txt'
+    c_loglikelihoods_f=open(c_loglikelihoods_fname,'w')
+    d_loglikelihoods_fname=DIR+file_name+'_d_likelihoods.txt'
+    d_loglikelihoods_f=open(d_loglikelihoods_fname,'w')
+    best_likelihoods_fname=DIR+file_name+'_best_likelihoods.txt'
+    best_likelihoods_f=open(best_likelihoods_fname,'w')
+    top_margin_fname=DIR+file_name+'_top_margin.txt'
+    top_margin_f=open(top_margin_fname,'w')
+    top_margin_wrong_fname=DIR+file_name+'_top_margin_wrong.txt'
+    top_margin_wrong_f=open(top_margin_wrong_fname,'w')
+    top_margin_correct_fname=DIR+file_name+'_top_margin_correct.txt'
+    top_margin_correct_f=open(top_margin_correct_fname,'w')
+    best_likelihoods_wrong_fname=DIR+file_name+'_best_likelihoods_wrong.txt'
+    best_likelihoods_wrong_f=open(best_likelihoods_wrong_fname,'w')
+    best_likelihoods_correct_fname=DIR+file_name+'_best_likelihoods_correct.txt'
+    best_likelihoods_correct_f=open(best_likelihoods_correct_fname,'w')
+
+
+
     if provide_description is not None:
         # nudge people to not specify it at all
         print(
@@ -334,8 +365,30 @@ def evaluate(
     # unpack results and sort back in order and return control to Task
     for (task_name, doc_id), requests in process_res_queue.items():
         requests.sort(key=lambda x: x[0])
-        requests = [x[1] for x in requests]
 
+        duplicate_req=copy.deepcopy(requests)
+        duplicate_req.sort(key=lambda x: x[1],reverse=True)
+        best_option = duplicate_req[0][0]
+        sorted_reqs=copy.deepcopy(requests)
+        sorted_reqs.sort(reverse=True)
+
+        a_loglikelihoods_f.write(str(np.exp(requests[0][1]))+' ')
+        b_loglikelihoods_f.write(str(np.exp(requests[1][1]))+' ')
+        c_loglikelihoods_f.write(str(np.exp(requests[2][1]))+' ')
+        d_loglikelihoods_f.write(str(np.exp(requests[3][1]))+' ')
+        best_likelihoods_f.write(str(np.exp(sorted_reqs[0]))+' ')
+        top_margin_f.write(str(np.exp(sorted_reqs[0])-np.exp(sorted_reqs[1]))+' ')
+        
+        if best_option == doc["gold"]:
+            top_margin_correct_f.write(str(np.exp(sorted_reqs[0])-np.exp(sorted_reqs[1]))+' ')
+            best_likelihoods_correct_f.write(str(np.exp(sorted_reqs[0]))+' ')
+        else:   
+            top_margin_wrong_f.write(str(np.exp(sorted_reqs[0])-np.exp(sorted_reqs[1]))+' ')
+            best_likelihoods_wrong_f.write(str(np.exp(sorted_reqs[0]))+' ')
+         
+        correct_exp_loglikelihoods_f.write(str(np.exp(requests[doc["gold"]]))+' ')
+
+        requests = [x[1] for x in requests]
         task = task_dict[task_name]
         doc = docs[(task_name, doc_id)]
 

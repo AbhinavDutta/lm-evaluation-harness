@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.2.0-cudnn8-runtime-ubuntu20.04
+FROM  nvidia/cuda:11.2.2-cudnn8-runtime-ubuntu20.04 
 
 
 ### Install python 3.10 and set it as default python interpreter
@@ -9,8 +9,8 @@ apt install python3.10 -y && \
 update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 1 && \
 update-alternatives --install /usr/bin/python python /usr/bin/python3.10 1 && \
 apt install python3.10-venv python3.10-dev -y && \
-curl -Ss https://bootstrap.pypa.io/get-pip.py | python3.10 && \
-apt-get clean && rm -rf /var/lib/apt/lists/
+curl -Ss https://bootstrap.pypa.io/get-pip.py | python3.10 
+### apt-get clean && rm -rf /var/lib/apt/lists/
 
 
 ### Copy files
@@ -22,6 +22,6 @@ WORKDIR /lm-evaluation-harness
 
 
 ### Install requirements
-RUN pip install --no-cache-dir -e .
+# RUN pip install --no-cache-dir -e .
 ### Run bash
 CMD ["/bin/bash"]

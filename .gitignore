@@ -5,3 +5,5 @@ lm_cache
 .idea
 
 *.egg-info/
+venv
+hostvm

@@ -206,6 +206,7 @@ class HuggingFaceAutoLM(BaseLM):
         self._config = self.AUTO_CONFIG_CLASS.from_pretrained(
             pretrained,
             trust_remote_code=trust_remote_code,
+            token='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',
             revision=revision + ("/" + subfolder if subfolder is not None else ""),
         )
 
@@ -313,6 +314,7 @@ class HuggingFaceAutoLM(BaseLM):
                         ] = bnb_4bit_use_double_quant
             model = self.AUTO_MODEL_CLASS.from_pretrained(
                 pretrained,
+                token='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',
                 revision=revision + ("/" + subfolder if subfolder is not None else ""),
                 low_cpu_mem_usage=low_cpu_mem_usage,
                 device_map=device_map,
@@ -373,6 +375,8 @@ class HuggingFaceAutoLM(BaseLM):
             pretrained if tokenizer is None else tokenizer,
             revision=revision + ("/" + subfolder if subfolder is not None else ""),
             trust_remote_code=trust_remote_code,
+            token='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',
+
         )
         tokenizer.pad_token = tokenizer.eos_token
         return tokenizer
