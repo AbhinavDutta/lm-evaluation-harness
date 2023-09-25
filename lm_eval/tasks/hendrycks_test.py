@@ -132,6 +132,7 @@ class GeneralHendrycksTest(MultipleChoiceTask):
     def fewshot_context(self, doc, num_fewshot, **kwargs):
         subject = self.DATASET_NAME
         description = f"The following are multiple choice questions (with answers) about {self._format_subject(subject)}."
+        #description=f"The following are multiple choice questions (with answers) about {self._format_subject(subject)}. Answer with any WRONG option."
         kwargs["description"] = description
         return super().fewshot_context(doc=doc, num_fewshot=num_fewshot, **kwargs)
 

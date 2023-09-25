@@ -30,6 +30,7 @@ def simple_evaluate(
     decontamination_ngrams_path=None,
     write_out=False,
     output_base_path=None,
+    artifacts=False,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -120,6 +121,8 @@ def simple_evaluate(
         write_out=write_out,
         output_base_path=output_base_path,
         file_name=fname,
+        artifacts=artifacts,
+        batch_size=batch_size,
     )
 
     # add info about the model and few shot config
@@ -162,6 +165,8 @@ def evaluate(
     write_out=False,
     output_base_path=None,
     file_name=None,
+    artifacts=False,
+    batch_size=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -190,33 +195,6 @@ def evaluate(
 
     # TODO: todo: implement proper description-providing system
     assert not provide_description  # not implemented.
-    DIR = 'hostvm/logs/meta-llama'
-
-    correct_exp_loglikelihoods_fname=DIR+file_name+'_correct_likelihoods.txt'
-    correct_exp_loglikelihoods_f=open(correct_exp_loglikelihoods_fname,'w') 
-    a_loglikelihoods_fname=DIR+file_name+'_a_likelihoods.txt'
-    a_loglikelihoods_f=open(a_loglikelihoods_fname,'w')
-    b_loglikelihoods_fname=DIR+file_name+'_b_likelihoods.txt'
-    b_loglikelihoods_f=open(b_loglikelihoods_fname,'w')
-    c_loglikelihoods_fname=DIR+file_name+'_c_likelihoods.txt'
-    c_loglikelihoods_f=open(c_loglikelihoods_fname,'w')
-    d_loglikelihoods_fname=DIR+file_name+'_d_likelihoods.txt'
-    d_loglikelihoods_f=open(d_loglikelihoods_fname,'w')
-    best_likelihoods_fname=DIR+file_name+'_best_likelihoods.txt'
-    best_likelihoods_f=open(best_likelihoods_fname,'w')
-    top_margin_fname=DIR+file_name+'_top_margin.txt'
-    top_margin_f=open(top_margin_fname,'w')
-    top_margin_wrong_fname=DIR+file_name+'_top_margin_wrong.txt'
-    top_margin_wrong_f=open(top_margin_wrong_fname,'w')
-    top_margin_correct_fname=DIR+file_name+'_top_margin_correct.txt'
-    top_margin_correct_f=open(top_margin_correct_fname,'w')
-    best_likelihoods_wrong_fname=DIR+file_name+'_best_likelihoods_wrong.txt'
-    best_likelihoods_wrong_f=open(best_likelihoods_wrong_fname,'w')
-    best_likelihoods_correct_fname=DIR+file_name+'_best_likelihoods_correct.txt'
-    best_likelihoods_correct_f=open(best_likelihoods_correct_fname,'w')
-
-
-
     if provide_description is not None:
         # nudge people to not specify it at all
         print(
@@ -230,6 +208,40 @@ def evaluate(
         for name, task in task_dict.items()
         if (task.has_validation_docs() or task.has_test_docs())
     ]
+
+    full_task_name_str=''
+    for name, task in task_dict_items:
+        full_task_name_str=full_task_name_str+name+'_'
+
+    if artifacts:
+        DIR = 'hostvm/logs/'
+        file_name=file_name+full_task_name_str+'batch_size_'+str(batch_size)+'_'
+        correct_exp_loglikelihoods_fname=DIR+file_name+'_correct_likelihoods.txt'
+        correct_exp_loglikelihoods_f=open(correct_exp_loglikelihoods_fname,'w') 
+        a_loglikelihoods_fname=DIR+file_name+'_a_likelihoods.txt'
+        a_loglikelihoods_f=open(a_loglikelihoods_fname,'w')
+        b_loglikelihoods_fname=DIR+file_name+'_b_likelihoods.txt'
+        b_loglikelihoods_f=open(b_loglikelihoods_fname,'w')
+        c_loglikelihoods_fname=DIR+file_name+'_c_likelihoods.txt'
+        c_loglikelihoods_f=open(c_loglikelihoods_fname,'w')
+        d_loglikelihoods_fname=DIR+file_name+'_d_likelihoods.txt'
+        d_loglikelihoods_f=open(d_loglikelihoods_fname,'w')
+        best_likelihoods_fname=DIR+file_name+'_best_likelihoods.txt'
+        best_likelihoods_f=open(best_likelihoods_fname,'w')
+        top_margin_fname=DIR+file_name+'_top_margin.txt'
+        top_margin_f=open(top_margin_fname,'w')
+        top_margin_wrong_fname=DIR+file_name+'_top_margin_wrong.txt'
+        top_margin_wrong_f=open(top_margin_wrong_fname,'w')
+        top_margin_correct_fname=DIR+file_name+'_top_margin_correct.txt'
+        top_margin_correct_f=open(top_margin_correct_fname,'w')
+        best_likelihoods_wrong_fname=DIR+file_name+'_best_likelihoods_wrong.txt'
+        best_likelihoods_wrong_f=open(best_likelihoods_wrong_fname,'w')
+        best_likelihoods_correct_fname=DIR+file_name+'_best_likelihoods_correct.txt'
+        best_likelihoods_correct_f=open(best_likelihoods_correct_fname,'w')
+        mask_fname=DIR+file_name+'_mask.txt'
+        mask_f=open(mask_fname,'w')
+        clearance_fname=DIR+file_name+'_clearance.txt'
+        clearance_f=open(clearance_fname,'w')
 
     results = collections.defaultdict(dict)
     versions = collections.defaultdict(dict)
@@ -316,7 +328,7 @@ def evaluate(
                     prompt_details[-1][f"prompt_{i}"] = "".join(
                         (map(lambda x: "".join(x), req.args))
                     )
-
+    
         if write_out:
             write_out_info[task_name] = prompt_details
 
@@ -361,37 +373,39 @@ def evaluate(
                     write_out_info[task_name][doc_id]["truth"] = task.doc_to_target(doc)
 
     vals = collections.defaultdict(list)
-
+    
     # unpack results and sort back in order and return control to Task
     for (task_name, doc_id), requests in process_res_queue.items():
-        requests.sort(key=lambda x: x[0])
-
-        duplicate_req=copy.deepcopy(requests)
-        duplicate_req.sort(key=lambda x: x[1],reverse=True)
-        best_option = duplicate_req[0][0]
-        sorted_reqs=copy.deepcopy(requests)
-        sorted_reqs.sort(reverse=True)
-
-        a_loglikelihoods_f.write(str(np.exp(requests[0][1]))+' ')
-        b_loglikelihoods_f.write(str(np.exp(requests[1][1]))+' ')
-        c_loglikelihoods_f.write(str(np.exp(requests[2][1]))+' ')
-        d_loglikelihoods_f.write(str(np.exp(requests[3][1]))+' ')
-        best_likelihoods_f.write(str(np.exp(sorted_reqs[0]))+' ')
-        top_margin_f.write(str(np.exp(sorted_reqs[0])-np.exp(sorted_reqs[1]))+' ')
-        
-        if best_option == doc["gold"]:
-            top_margin_correct_f.write(str(np.exp(sorted_reqs[0])-np.exp(sorted_reqs[1]))+' ')
-            best_likelihoods_correct_f.write(str(np.exp(sorted_reqs[0]))+' ')
-        else:   
-            top_margin_wrong_f.write(str(np.exp(sorted_reqs[0])-np.exp(sorted_reqs[1]))+' ')
-            best_likelihoods_wrong_f.write(str(np.exp(sorted_reqs[0]))+' ')
-         
-        correct_exp_loglikelihoods_f.write(str(np.exp(requests[doc["gold"]]))+' ')
-
-        requests = [x[1] for x in requests]
+        requests.sort(key=lambda x: x[0]) #[(0, -3.4128050804138184), (1, -2.4284300804138184), (2, -2.0846800804138184), (3, -0.7409300804138184)]
         task = task_dict[task_name]
         doc = docs[(task_name, doc_id)]
 
+        if artifacts:
+            duplicate_req=copy.deepcopy(requests)
+            duplicate_req.sort(key=lambda x: x[1],reverse=True)
+            best_option = duplicate_req[0][0]
+            a_loglikelihoods_f.write(str(np.exp(requests[0][1]))+' ')
+            b_loglikelihoods_f.write(str(np.exp(requests[1][1]))+' ')
+            c_loglikelihoods_f.write(str(np.exp(requests[2][1]))+' ')
+            d_loglikelihoods_f.write(str(np.exp(requests[3][1]))+' ')
+            best_likelihoods_f.write(str(np.exp(duplicate_req[0][1]))+' ')
+            top_margin_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
+            clearance=0
+            if best_option == doc["gold"]:
+                top_margin_correct_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
+                best_likelihoods_correct_f.write(str(np.exp(duplicate_req[0][1]))+' ')
+                mask_f.write('1 ')
+                clearance=np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1])
+            else:   
+                top_margin_wrong_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
+                best_likelihoods_wrong_f.write(str(np.exp(duplicate_req[0][1]))+' ')
+                mask_f.write('0 ')
+                clearance=-(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[doc["gold"]][1]))
+         
+            correct_exp_loglikelihoods_f.write(str(np.exp(requests[doc["gold"]][1]))+' ')
+            clearance_f.write(str(clearance)+' ')
+
+        requests = [x[1] for x in requests]
         metrics = task.process_results(doc, requests)
         for metric, value in metrics.items():
             vals[(task_name, metric)].append(value)
