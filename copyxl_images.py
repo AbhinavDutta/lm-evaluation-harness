@@ -162,11 +162,11 @@ def dump_batch_size_variation(artifact,DIR,worksheet):
         col=5
         for task in POSSIBLE_TASKS:
             for batch_size in POSSIBLE_BATCH:
-                worksheet.write_string(row,col,'haha')
+                worksheet.set_row(row , 160)
+                worksheet.set_column(col,col,36)
+                #worksheet.write_string(row,col,'haha')
+                worksheet.insert_image(row,col, map_config_to_image[model+quantization+'normal'+shot+batch_size+task+artifact],{'x_scale': 0.4, 'y_scale': 0.4}) 
                 col=col+2
-                worksheet.set_row(row , 200)
-                worksheet.set_column(col,45)
-                worksheet.insert_image(row,col, map_config_to_image[model+quantization+'normal'+shot+batch_size+task+artifact],{'x_scale': 0.5, 'y_scale': 0.5}) 
             col=col+1
         row=row+1
       row=row+1
@@ -191,11 +191,11 @@ def dump_qtz_variation(artifact,DIR,worksheet):
       col=5
       for task in POSSIBLE_TASKS:
         for quantization in POSSIBLE_QTZ:
-            worksheet.write_string(row,col,'haha')
+            worksheet.set_row(row , 160)
+            worksheet.set_column(col,col,36)
+            #worksheet.write_string(row,col,'haha')
+            worksheet.insert_image(row,col, map_config_to_image_batch1[model+quantization+'normal'+shot+'batch=1'+task+artifact],{'x_scale': 0.4, 'y_scale': 0.4})
             col=col+2
-            worksheet.set_row(row , 200)
-            worksheet.set_column(col,45)
-            worksheet.insert_image(row,col, map_config_to_image_batch1[model+quantization+'normal'+shot+'batch=1'+task+artifact],{'x_scale': 0.5, 'y_scale': 0.5})
         col=col+1    
       row=row+1
     row=row+1
@@ -223,11 +223,11 @@ def dump_batch_size_variation_multicategory(artifact,DIR,worksheet):
             col=5
             for task in POSSIBLE_TASKS:
               for  batch_size in POSSIBLE_BATCH:
-                worksheet.write_string(row,col,'haha')
+                #worksheet.write_string(row,col,'haha')
+                worksheet.set_row(row , 160)
+                worksheet.set_column(col,col,36)
+                worksheet.insert_image(row,col, map_config_to_image[model+quantization+category+shot+batch_size+task+artifact],{'x_scale': 0.4, 'y_scale': 0.4})
                 col=col+2
-                worksheet.set_row(row , 200)
-                worksheet.set_column(col,45)
-                worksheet.insert_image(row,col, map_config_to_image[model+quantization+category+shot+batch_size+task+artifact],{'x_scale': 0.5, 'y_scale': 0.5})
               col=col+1  
             row=row+1
         row=row+1
@@ -256,11 +256,11 @@ def dump_qtz_variation_multicategory(artifact,DIR,worksheet):
         col=5
         for task in POSSIBLE_TASKS:
             for quantization in POSSIBLE_QTZ:
-                worksheet.write_string(row,col,'haha')
+                #worksheet.write_string(row,col,'haha')
+                worksheet.set_row(row , 160)
+                worksheet.set_column(col,col,36)
+                worksheet.insert_image(row,col, map_config_to_image[model+quantization+category+shot+'batch=1'+task+artifact],{'x_scale': 0.4, 'y_scale': 0.4})
                 col=col+2
-                worksheet.set_row(row , 200)
-                worksheet.set_column(col,45)
-                worksheet.insert_image(row,col, map_config_to_image[model+quantization+category+shot+'batch=1'+task+artifact],{'x_scale': 0.5, 'y_scale': 0.5})
             col=col+1
         row=row+1
       row=row+1
