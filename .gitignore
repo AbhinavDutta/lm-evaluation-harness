@@ -7,3 +7,4 @@ lm_cache
 *.egg-info/
 venv
 hostvm
+*.xlsx
