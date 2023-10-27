@@ -132,7 +132,7 @@ class GeneralHendrycksTest(MultipleChoiceTask):
     def fewshot_context(self, doc, num_fewshot, **kwargs):
         subject = self.DATASET_NAME
         description = f"The following are multiple choice questions (with answers) about {self._format_subject(subject)}."
-        #description=f"The following are multiple choice questions (with answers) about {self._format_subject(subject)}. Answer with any WRONG option."
+        #description=f"The following are multiple choice questions (with answers) about {self._format_subject(subject)} in the context of USA."
         kwargs["description"] = description
         return super().fewshot_context(doc=doc, num_fewshot=num_fewshot, **kwargs)
 
@@ -148,11 +148,38 @@ class GeneralHendrycksTest(MultipleChoiceTask):
             """
 
             question = doc["question"].strip()
+            
             choices = "".join(
                 [f"{key}. {choice}\n" for key, choice in zip(keys, doc["choices"])]
             )
+            '''
+            choice_arr = []
+            correct_answer = ""
+            correct_option = 0
+            for choice in  doc["choices"]:
+                choice_arr.append(choice)
+                if doc['choices'].index(choice) == doc['answer']:
+                    correct_answer=choice
+
+            choice_arr.sort(key=lambda x:-len(x))
+            for ch in choice_arr:
+                if ch==correct_answer:
+                    correct_option=choice_arr.index(ch)
+            doc["answer"]=correct_option
+            choices="".join([f"{key}. {choice}\n" for key, choice in zip(keys, choice_arr)])
+            
+            
+            for opt,choice in zip([0,1,2,3],doc["choices"]):
+                if opt == doc["answer"]:
+                    continue
+                    choices=choices+ f"{chr(ord('E')+opt)}. None of the above\n"
+                else:
+                    choices=choices+ f"{chr(ord('E')+opt)}. {choice}\n"
+            ''' 
+            #choices=choices+ "E. A or B or C or D\n"
             prompt = f"{question}\n{choices}Answer:"
-            return prompt
+
+            return prompt.upper()
 
         keys = ["A", "B", "C", "D"]
         return {

@@ -11,6 +11,7 @@ from sqlitedict import SqliteDict
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
+from torch.profiler import profile, record_function, ProfilerActivity
 from accelerate import find_executable_batch_size
 
 from lm_eval.metrics import mean, weighted_perplexity, weighted_mean, bits_per_byte
@@ -367,10 +368,15 @@ class BaseLM(LM):
                 inplens.append(inplen)
 
             batched_inps = torch.cat(inps, dim=0)  # [batch, padding_length]
-            multi_logits = F.log_softmax(
-                self._model_call(batched_inps), dim=-1
-            ).cpu()  # [batch, padding_length, vocab]
 
+            with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+                multi_logits = F.log_softmax(
+                    self._model_call(batched_inps), dim=-1
+                ).cpu()  # [batch, padding_length, vocab]
+            arr = self._model_call(batched_inps)[0][0][0].item()
+            print('-------------------',type(arr))
+            prof.export_chrome_trace("trace_4bit_128batch.json")
+            exit()
             for (cache_key, _, _), logits, inp, inplen, cont_toks in zip(
                 chunk, multi_logits, inps, inplens, cont_toks_list
             ):

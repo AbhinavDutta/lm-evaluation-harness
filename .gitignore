@@ -7,3 +7,6 @@ lm_cache
 *.egg-info/
 venv
 hostvm
+*.png
+*.json
+*.xlsx

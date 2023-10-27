@@ -242,6 +242,12 @@ def evaluate(
         mask_f=open(mask_fname,'w')
         clearance_fname=DIR+file_name+'_clearance.txt'
         clearance_f=open(clearance_fname,'w')
+        correct_option_length_fname=DIR+file_name+'_correct_option_length.txt'
+        correct_option_length_f=open(correct_option_length_fname,'w')
+        best_option_length_fname=DIR+file_name+'_best_option_length.txt'
+        best_option_length_f=open(best_option_length_fname,'w')
+        best_option_norm_length_fname=DIR+file_name+'_best_option_norm_length.txt'
+        best_option_norm_length_f=open(best_option_norm_length_fname,'w')
 
     results = collections.defaultdict(dict)
     versions = collections.defaultdict(dict)
@@ -384,12 +390,18 @@ def evaluate(
             duplicate_req=copy.deepcopy(requests)
             duplicate_req.sort(key=lambda x: x[1],reverse=True)
             best_option = duplicate_req[0][0]
+            completion_len = np.array([float(len(i)) for i in doc["choices"]])
+            _results= [x[1] for x in requests]
+            best_option_norm = np.argmax(_results / completion_len) 
             a_loglikelihoods_f.write(str(np.exp(requests[0][1]))+' ')
             b_loglikelihoods_f.write(str(np.exp(requests[1][1]))+' ')
             c_loglikelihoods_f.write(str(np.exp(requests[2][1]))+' ')
             d_loglikelihoods_f.write(str(np.exp(requests[3][1]))+' ')
             best_likelihoods_f.write(str(np.exp(duplicate_req[0][1]))+' ')
             top_margin_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
+            correct_option_length_f.write(str(len(doc["choices"][doc["gold"]]))+' ')
+            best_option_length_f.write(str(len(doc["choices"][best_option]))+' ')
+            best_option_norm_length_f.write(str(len(doc["choices"][best_option_norm]))+' ')
             clearance=0
             if best_option == doc["gold"]:
                 top_margin_correct_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
