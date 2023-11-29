@@ -96,65 +96,20 @@ def getinfo(file):
         if file.find(key_)!=-1:
             artifacts=value
             break
-    if task=='' or artifacts=='':
-       assert(False)
 
-    return model,quantization,wrong_corr_norm,shot,batch_size,task,artifacts
+    return model,quantization,type,shot,task
 
 
-data_table={}
-for file in (os.listdir(DIR)):
+
+
+
+#write code to iterate over all files in the directory that have the above prefix
+for file in os.listdir('./aggregated_logs'):
     if fnmatch.fnmatch(file, prefix):
-        model,quantization,wrong_corr_norm,shot,batch_size,task,artifacts=getinfo(file) 
-        data_collected = np.loadtxt(DIR+file)
-        if len(data_collected)<3: #skip over empty files
-          continue
-        key = model+quantization+wrong_corr_norm+shot+batch_size+task+artifacts
-        data_table[key]=data_collected
-
-
-
-#Scatter Plots batch size variation
-for file in tqdm.tqdm(os.listdir(DIR)):
-    if fnmatch.fnmatch(file, prefix):
-        model,quantization,wrong_corr_norm,shot,batch_size,task,artifacts=getinfo(file) 
         
-        #print(model,quantization,wrong_corr_norm,shot,batch_size,task,artifacts)
-        if artifacts=='mask': #dont scatter plots for these
-           continue
-        data_collected = np.loadtxt(DIR+file)
-        if len(data_collected)<3: #skip over empty files
-            continue
-        comment=''
-        if batch_size!='batch=1' and (artifacts=='A option likelihood' or artifacts=='B option likelihood' or artifacts=='C option likelihood' or artifacts=='D option likelihood'):
-           comment='_DIFF_WRT_bs1_'
-           if model+quantization+wrong_corr_norm+shot+'batch=1'+task+artifacts not in data_table:
-              continue
-           data_collected=np.subtract(data_collected,data_table[model+quantization+wrong_corr_norm+shot+'batch=1'+task+artifacts])
-           
-        fig, ax = plt.subplots( nrows=1, ncols=1 )  # create figure & 1 axis
-        x = np.arange(0,len(data_collected))
-        ax.plot(x, data_collected)
     
-        label='total= '+str(len(data_collected))+str(' mean= %.5f'%np.mean(data_collected))+str(' std dev= %.5f '%np.std(data_collected))
-        ax.set_xlabel(label)
-        
-        plt.title(model+', '+quantization+', '+wrong_corr_norm+', '+shot+', '+batch_size+', '+artifacts+' '+comment+', '+task,loc='center', wrap=True)
-        
-        fig.savefig(ART_PATH_BATCH+file+comment+'_scatter_plot.png')   # save the figure to file
-        plt.close(fig)    # close the figure window
-
-
-#Scatter Plots quantization variation
-for file in tqdm.tqdm(os.listdir(DIR)):
-    if fnmatch.fnmatch(file, prefix):
-        model,quantization,wrong_corr_norm,shot,batch_size,task,artifacts=getinfo(file) 
-        
-        #print(model,quantization,wrong_corr_norm,shot,batch_size,task,artifacts)
-        if artifacts=='mask': #dont scatter plots for these
-           continue
-        data_collected = np.loadtxt(DIR+file)
-        if len(data_collected)<3: #skip over empty files
+        data_collected = np.loadtxt('./aggregated_logs/'+file)
+        if len(data_collected)<3:
             continue
         comment=''
         if quantization!='16bit' and (artifacts=='A option likelihood' or artifacts=='B option likelihood' or artifacts=='C option likelihood' or artifacts=='D option likelihood'):
