@@ -8,9 +8,15 @@ import lm_eval.tasks
 import lm_eval.base
 from lm_eval.utils import positional_deprecated, run_task_tests
 from lm_eval.models.gpt2 import HFLM
-
+import tqdm
 import numpy as np
 import transformers
+import sys, os
+sys.path.append('/code/tensorrt_llm/examples/llama')
+from run import tensorrt_get_log_probs,helper_v1,helper_v2
+import torch
+from torch.profiler import profile, record_function, ProfilerActivity
+import io
 
 
 @positional_deprecated
@@ -358,10 +364,52 @@ def evaluate(
         #       they should end up next to each other.
 
         print("Running", reqtype, "requests")
-        resps = getattr(lm, reqtype)([req.args for req in reqs])
+        
+        #resps = getattr(lm, reqtype)([req.args for req in reqs])
+        
+        #print(resps)
+        
+        str_reqs = []
+        for req in reqs:
+            str_reqs.append((req.args[0],req.args[1].strip()))
+        resps_trt_proper = []
+        resps_trt_proper = helper_v1(str_reqs)
+        resps_trt = []
+        for r in resps_trt_proper:
+            resps_trt.append((r,None))
+        
+        resps = resps_trt
+        '''
+        diff = []
+
+        for i in range(len(resps)):
+            diff.append(abs(resps[i][0]-resps_trt[i][0]))
+        print('\n\n')
+        print(diff)
+        print('\n\n')
+        print('mean =',np.mean(diff))
+        print('max =',np.max(diff))
+        resps = resps_trt
+
+        #print(resps_trt)
+        
+        arg_map = {'max_output_len': 3, 'log_level': 'error', 'engine_dir': '/root/tmp/llama/7B/trt_engines/fp16/1-gpu/', 'tokenizer_dir': '/root/azure-storage/llama-70b-ckpts/llama-7b-hf-weights', 'input_text': "'The following are multiple choice questions (with answers) about philosophy.\\n\\nAnscombe criticizes as absurd Kant’s idea of:\\nA. the thing in itself.\\nB. the categorical imperative.\\nC. the phenomenal self.\\nD. legislating for oneself.\\nAnswer:'", 'input_file': None, 'output_csv': None, 'output_npy': None, 'num_beams': 1, 'streaming': False, 'streaming_interval': 5}
+        
+        for req.args in (reqs):
+            stripped_opt = req.args.args[1].strip()
+            arg_map['input_text'] = req.args.args[0]
+            log_prob = tensorrt_get_log_probs(**(arg_map),continuation_text= stripped_opt) 
+            resps_trt.append((log_prob,None))
+
+        for p1,p2 in zip(resps,resps_trt):
+            print(p1[0],p2[0])
+        '''
+        
+        #print('resp - ', resps) #resp -  [(-1.271921992301941, True), (-1.865671992301941, False), (-2.3656721115112305, False), (-2.3500471115112305, False)
         resps = [
             x if req.index is None else x[req.index] for x, req in zip(resps, reqs)
         ]
+        #print('resp - ', resps)
 
         for resp, (i, task_name, doc, doc_id) in zip(resps, requests_origin[reqtype]):
             process_res_queue[(task_name, doc_id)].append((i, resp))

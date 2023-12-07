@@ -179,7 +179,8 @@ class GeneralHendrycksTest(MultipleChoiceTask):
             #choices=choices+ "E. A or B or C or D\n"
             prompt = f"{question}\n{choices}Answer:"
 
-            return prompt.upper()
+            #return prompt.upper()
+            return prompt
 
         keys = ["A", "B", "C", "D"]
         return {

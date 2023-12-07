@@ -324,7 +324,7 @@ class BaseLM(LM):
             # because vectorizing is annoying, we first convert each (context, continuation) pair to padded
             # tensors, then we pack them together into a batch, call the model, and then pick it all apart
             # again because vectorizing is annoying
-
+            
             for _, context_enc, continuation_enc in chunk:
                 # sanity check
                 assert len(context_enc) > 0
@@ -368,41 +368,37 @@ class BaseLM(LM):
                 inplens.append(inplen)
 
             batched_inps = torch.cat(inps, dim=0)  # [batch, padding_length]
-
-            with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
-                multi_logits = F.log_softmax(
+           
+            #print('inps= ',inps,'\n', 'cont_toks_list= ',cont_toks_list,'\n','inplens= ',inplens)
+            #with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
+            multi_logits = F.log_softmax(
                     self._model_call(batched_inps), dim=-1
                 ).cpu()  # [batch, padding_length, vocab]
-            arr = self._model_call(batched_inps)[0][0][0].item()
-            print('-------------------',type(arr))
-            prof.export_chrome_trace("trace_4bit_128batch.json")
-            exit()
+            #print(multi_logits.shape)
+            #arr = self._model_call(batched_inps)[0][0][0].item()
+            #print('-------------------',type(arr))
+            #prof.export_chrome_trace("trace_4bit_128batch.json")
+            #exit()
             for (cache_key, _, _), logits, inp, inplen, cont_toks in zip(
                 chunk, multi_logits, inps, inplens, cont_toks_list
             ):
-
                 # Slice to original seq length
                 contlen = len(cont_toks)
-                inplen = inplen + (
-                    logits.shape[0] - padding_length
-                )  # if "virtual tokens" (from prompt tuning) are added, inplen is larger
-                logits = logits[inplen - contlen : inplen].unsqueeze(
-                    0
-                )  # [1, seq, vocab]
-
+                inplen = inplen + (logits.shape[0] - padding_length)  # if "virtual tokens" (from prompt tuning) are added, inplen is larger
+                logits = logits[inplen - contlen : inplen].unsqueeze(0)  # [1, seq, vocab]
+                #print(logits.shape)
                 # Check if per-token argmax is exactly equal to continuation
+                
                 greedy_tokens = logits.argmax(dim=-1)
-                cont_toks = torch.tensor(cont_toks, dtype=torch.long).unsqueeze(
-                    0
-                )  # [1, seq]
+                cont_toks = torch.tensor(cont_toks, dtype=torch.long).unsqueeze(0)  # [1, seq]
+                #print(cont_toks, greedy_tokens)
                 max_equal = (greedy_tokens == cont_toks).all()
 
                 # Obtain log-probs at the corresponding continuation token indices
                 # last_token_slice = logits[:, -1, :].squeeze(0).tolist()
-                logits = torch.gather(logits, 2, cont_toks.unsqueeze(-1)).squeeze(
-                    -1
-                )  # [1, seq]
-
+                logits = torch.gather(logits, 2, cont_toks.unsqueeze(-1)).squeeze(-1)  # [1, seq]
+                #print(logits.shape)
+                #print()
                 # Answer: (log prob, is-exact-match)
                 answer = (float(logits.sum()), bool(max_equal))
 
@@ -411,7 +407,7 @@ class BaseLM(LM):
                     self.cache_hook.add_partial("loglikelihood", cache_key, answer)
 
                 res.append(answer)
-
+            #print('______________________________')
         return re_ord.get_original(res)
 
     def greedy_until(self, requests):
