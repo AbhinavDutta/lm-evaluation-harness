@@ -37,6 +37,8 @@ def simple_evaluate(
     write_out=False,
     output_base_path=None,
     artifacts=False,
+    engine_dir=None,
+    tokenizer_dir=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -74,9 +76,10 @@ def simple_evaluate(
     """
     random.seed(1234)
     np.random.seed(1234)
-
     assert tasks != [], "No tasks specified"
+    lm = None
 
+    '''
     if isinstance(model, str):
         if model_args is None:
             model_args = ""
@@ -108,14 +111,16 @@ def simple_evaluate(
             + model_args.replace("=", "-").replace(",", "_").replace("/", "-")
             + ".db",
         )
+    '''
 
     task_dict = lm_eval.tasks.get_task_dict(tasks)
 
     if check_integrity:
         run_task_tests(task_list=tasks)
-    fname = ''.join(e for e in model_args if e.isalnum()) if isinstance(model, str) else 'default'
-    fname = fname + 'fewshot' + str(num_fewshot)
 
+    fname = ''.join(e for e in engine_dir if e.isalnum())
+    #fname = ''.join(e for e in model_args if e.isalnum())
+    fname = fname + 'fewshot' + str(num_fewshot)
     results = evaluate(
         lm=lm,
         task_dict=task_dict,
@@ -129,14 +134,18 @@ def simple_evaluate(
         file_name=fname,
         artifacts=artifacts,
         batch_size=batch_size,
+        engine_dir=engine_dir,
+        tokenizer_dir=tokenizer_dir,
     )
 
     # add info about the model and few shot config
-    model_name = None
+    model_name = engine_dir
+    '''
     if isinstance(model, str):
         model_name = model
     elif isinstance(model, transformers.PreTrainedModel):
         model_name = "pretrained=" + model.config._name_or_path
+    '''
     results["config"] = {
         "model": model_name,
         "model_args": model_args,
@@ -173,6 +182,8 @@ def evaluate(
     file_name=None,
     artifacts=False,
     batch_size=None,
+    engine_dir=None,
+    tokenizer_dir=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -369,16 +380,18 @@ def evaluate(
         
         #print(resps)
         
+        
         str_reqs = []
         for req in reqs:
             str_reqs.append((req.args[0],req.args[1].strip()))
         resps_trt_proper = []
-        resps_trt_proper = helper_v1(str_reqs)
+        resps_trt_proper = helper_v1(str_reqs,engine_dir,tokenizer_dir)
         resps_trt = []
         for r in resps_trt_proper:
             resps_trt.append((r,None))
         
         resps = resps_trt
+        
         '''
         diff = []
 
