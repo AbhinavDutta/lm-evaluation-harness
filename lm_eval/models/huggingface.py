@@ -323,6 +323,7 @@ class HuggingFaceAutoLM(BaseLM):
                 load_in_8bit=load_in_8bit,
                 trust_remote_code=trust_remote_code,
                 torch_dtype=torch_dtype,
+                cache_dir="/root/azure-storage/huggingface",
                 **model_kwargs,
             )
         else:

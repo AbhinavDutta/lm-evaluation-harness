@@ -12,8 +12,8 @@ import tqdm
 import numpy as np
 import transformers
 import sys, os
-sys.path.append('/code/tensorrt_llm/examples/llama')
-from run import tensorrt_get_log_probs,helper_v1,helper_v2
+sys.path.append('/code/tensorrt_llm/examples')
+#from run import helper_v1
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 import io
@@ -79,7 +79,7 @@ def simple_evaluate(
     assert tasks != [], "No tasks specified"
     lm = None
 
-    '''
+    
     if isinstance(model, str):
         if model_args is None:
             model_args = ""
@@ -111,15 +111,17 @@ def simple_evaluate(
             + model_args.replace("=", "-").replace(",", "_").replace("/", "-")
             + ".db",
         )
-    '''
+    
 
     task_dict = lm_eval.tasks.get_task_dict(tasks)
 
     if check_integrity:
         run_task_tests(task_list=tasks)
 
-    fname = ''.join(e for e in engine_dir if e.isalnum())
-    #fname = ''.join(e for e in model_args if e.isalnum())
+    if engine_dir is not None:
+        fname = ''.join(e for e in engine_dir if e.isalnum())
+    else:
+        fname = ''.join(e for e in model_args if e.isalnum())
     fname = fname + 'fewshot' + str(num_fewshot)
     results = evaluate(
         lm=lm,
@@ -376,47 +378,39 @@ def evaluate(
 
         print("Running", reqtype, "requests")
         
-        #resps = getattr(lm, reqtype)([req.args for req in reqs])
+        resps = getattr(lm, reqtype)([req.args for req in reqs])
         
         #print(resps)
         
-        
+        '''
         str_reqs = []
         for req in reqs:
             str_reqs.append((req.args[0],req.args[1].strip()))
         resps_trt_proper = []
-        resps_trt_proper = helper_v1(str_reqs,engine_dir,tokenizer_dir)
+        resps_trt_proper = helper_v1(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
         resps_trt = []
         for r in resps_trt_proper:
             resps_trt.append((r,None))
         
         resps = resps_trt
         
-        '''
+        for r1,r2 in zip(resps,resps_trt):
+            print(r1[0],r2[0])
         diff = []
 
-        for i in range(len(resps)):
+        for i in range(len(resps)): 
+            #print(str_reqs[0])
+            assert(str_reqs[i][0] == reqs[i].args[0] and str_reqs[i][1] == reqs[i].args[1].strip())
+            #print(resps[i][0],resps_trt[i][0])
             diff.append(abs(resps[i][0]-resps_trt[i][0]))
         print('\n\n')
-        print(diff)
+        #print(diff)
         print('\n\n')
         print('mean =',np.mean(diff))
         print('max =',np.max(diff))
         resps = resps_trt
-
-        #print(resps_trt)
-        
-        arg_map = {'max_output_len': 3, 'log_level': 'error', 'engine_dir': '/root/tmp/llama/7B/trt_engines/fp16/1-gpu/', 'tokenizer_dir': '/root/azure-storage/llama-70b-ckpts/llama-7b-hf-weights', 'input_text': "'The following are multiple choice questions (with answers) about philosophy.\\n\\nAnscombe criticizes as absurd Kant’s idea of:\\nA. the thing in itself.\\nB. the categorical imperative.\\nC. the phenomenal self.\\nD. legislating for oneself.\\nAnswer:'", 'input_file': None, 'output_csv': None, 'output_npy': None, 'num_beams': 1, 'streaming': False, 'streaming_interval': 5}
-        
-        for req.args in (reqs):
-            stripped_opt = req.args.args[1].strip()
-            arg_map['input_text'] = req.args.args[0]
-            log_prob = tensorrt_get_log_probs(**(arg_map),continuation_text= stripped_opt) 
-            resps_trt.append((log_prob,None))
-
-        for p1,p2 in zip(resps,resps_trt):
-            print(p1[0],p2[0])
         '''
+
         
         #print('resp - ', resps) #resp -  [(-1.271921992301941, True), (-1.865671992301941, False), (-2.3656721115112305, False), (-2.3500471115112305, False)
         resps = [
@@ -446,7 +440,8 @@ def evaluate(
         requests.sort(key=lambda x: x[0]) #[(0, -3.4128050804138184), (1, -2.4284300804138184), (2, -2.0846800804138184), (3, -0.7409300804138184)]
         task = task_dict[task_name]
         doc = docs[(task_name, doc_id)]
-
+        correct_answers_f=open('hostvm/correct_answers/hendrycksTest-high_school_government_and_politics.txt','a')
+        correct_answers_f.write(doc["choices"][doc["gold"]]+' ')
         if artifacts:
             duplicate_req=copy.deepcopy(requests)
             duplicate_req.sort(key=lambda x: x[1],reverse=True)
