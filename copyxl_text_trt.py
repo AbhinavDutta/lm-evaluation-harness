@@ -29,7 +29,9 @@ ARTIFACT_TO_ENGLISH= {'best_likelihoods': 'best likelihood',
                     }
 
 
-POSSIBLE_TASKS=['abstract algebra','machine learning', 'philosophy', 'govt politics']
+#POSSIBLE_TASKS=['abstract algebra','machine learning', 'philosophy', 'govt politics']
+#POSSIBLE_TASKS=['abstract algebra', 'philosophy', 'govt politics']
+POSSIBLE_TASKS=['abstract algebra', 'machine learning', 'philosophy', 'govt politics']
 POSSIBLE_MODELS=['llama7bchat','llama13bchat','llama70bchat']
 POSSIBLE_CAT=['normal', 'wrong', 'correct']
 POSSIBLE_SHOT=['0shot',  '1shot', '3shot', '5shot']
@@ -733,7 +735,7 @@ def print_info_qtz(agg_artifact,map_config_to_data,worksheet,row,col,model,quant
 
     if a1.size==0 or a2.size==0:
       print(model+quantization+wrong_corr_norm+shot+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+agg_artifact)
-      exit()
+      
       worksheet.write_string(row,col,'NA')
       worksheet.write_string(row,col+1,'NA')
     else:
@@ -787,7 +789,7 @@ def dump_qtz_variation(agg_artifact,DIR,worksheet):
       row=row+1
     row=row+1
   row=row+1
-
+'''
 def print_artifacts():
   for agg_artifact in (POSSIBLE_AGG_ARTIFACTS):
     #print(agg_artifact)
@@ -805,3 +807,493 @@ def validate():
   validating_hypothesis(map_config_to_data=map_config_to_data)
 
 validate()
+'''
+
+def getinfo_noisy(file):
+    model=''
+    if file.find('yi6bchat')!=-1:
+      model='yi6bchat' 
+    else:
+       assert(False)
+    
+
+    wrong_corr_norm=''
+    
+    if file.find('wrong')!=-1:
+      wrong_corr_norm='wrong'
+    elif file.find('correct_likelihoods')==-1 and file.find('correct')!=-1:
+      wrong_corr_norm='correct'
+    else:
+      wrong_corr_norm='normal'
+    
+
+
+    shot=''
+    if file.find('fewshot1')!=-1:
+      shot='1shot'
+    elif file.find('fewshot3')!=-1:
+      shot='3shot'
+    elif file.find('fewshot5')!=-1:
+      shot='5shot'
+    elif file.find('fewshot0')!=-1:
+       shot='0shot'
+    else:
+      assert(False)
+
+    
+    possible_tasks = {'hendrycksTest-abstract_algebra': 'abstract algebra',
+                      'hendrycksTest-machine_learning': 'machine learning', 'hendrycksTest-philosophy': 'philosophy', 'hendrycksTest-high_school_government_and_politics': 'govt politics',
+    }
+
+    task=''
+    for key_,value in possible_tasks.items():
+       if file.find(key_)!=-1:
+          task=value
+          break
+                          
+    #print(task)
+    artifacts=''
+    possible_artifacts= {'best_likelihoods': 'best likelihood',
+                    'correct_likelihoods':'ground truth likelihood',
+                    'top_margin':'margin between best 2',
+                    'a_likelihoods':'A option likelihood',
+                    'b_likelihoods':'B option likelihood',
+                    'c_likelihoods':'C option likelihood',
+                    'd_likelihoods':'D option likelihood',
+                    'clearance': 'clearance',
+                    '_mask': 'mask',
+                    'best_option_length':'best option length',
+                    'best_option_norm_length':'best option norm length',
+                    'correct_option_length':'correct option length',
+                    }
+    for key_,value in possible_artifacts.items():
+        if file.find(key_)!=-1:
+            artifacts=value
+            break
+    if task=='' or artifacts=='':
+       assert(False)
+
+    if file.find('noise10useaccelerate')!=-1:
+      noise_level='10.0'
+    elif file.find('noise11useaccelerate')!=-1:
+      noise_level='11.0'
+    elif file.find('noise12useaccelerate')!=-1:
+      noise_level='12.0'
+    elif file.find('noise13useaccelerate')!=-1:
+      noise_level='13.0'
+    elif file.find('noise14useaccelerate')!=-1:
+      noise_level='14.0'
+    elif file.find('noise15useaccelerate')!=-1:
+      noise_level='15.0'
+    elif file.find('noise35useaccelerate')!=-1:
+      noise_level='3.5'
+    elif file.find('noise4useaccelerate')!=-1:
+      noise_level='4.0'
+    elif file.find('noise45useaccelerate')!=-1:
+      noise_level='4.5'
+    elif file.find('noise5useaccelerate')!=-1:
+      noise_level='5.0'
+    elif file.find('noise55useaccelerate')!=-1:
+      noise_level='5.5'
+    elif file.find('noise6useaccelerate')!=-1:
+      noise_level='6.0'
+    elif file.find('noise65useaccelerate')!=-1:
+      noise_level='6.5'
+    elif file.find('noise7useaccelerate')!=-1:
+      noise_level='7.0'
+    elif file.find('noise75useaccelerate')!=-1:
+      noise_level='7.5'
+    elif file.find('noise8useaccelerate')!=-1:
+      noise_level='8.0'
+    elif file.find('noise85useaccelerate')!=-1:  
+      noise_level='8.5'
+    elif file.find('noise9useaccelerate')!=-1:
+      noise_level='9.0'
+    elif file.find('noiseuseaccelerate') == -1:
+      noise_level='16.0'
+    else:
+      print(file)
+      assert(False)
+
+    return model,wrong_corr_norm,shot,task,artifacts,noise_level
+
+
+def get_map_config_to_data_noisy(DIR):
+  map_config_to_data=collections.defaultdict(lambda:np.array([]))
+  #map_config_to_data={}
+  for file in sorted(os.listdir(DIR)):
+    print(file)
+    if  fnmatch.fnmatch(file,'*.txt') and fnmatch.fnmatch(file,'*rootazurestorage*'):
+      model,wrong_corr_norm,shot,task,_artifacts,noise_level=getinfo_noisy(file)
+      #print(model,shot,wrong_corr_norm,task,_artifacts,noise_level)
+      arr=np.loadtxt(DIR+file)
+      map_config_to_data[model+wrong_corr_norm+shot+task+_artifacts+str(noise_level)]=arr
+  return map_config_to_data
+
+
+def entropy(a1,b1,c1,d1):
+  #print(a1,b1,c1,d1)
+  entropy=0.0
+  for a,b,c,d in zip(a1,b1,c1,d1):
+    entropy += -a*np.log(a)-b*np.log(b)-c*np.log(c)-d*np.log(d)
+  entropy = entropy*1.0/len(a1)
+  return entropy
+  
+
+def plot_entropy(map_config_to_data):
+  x = NOISE_LEVEL
+  #print(sorted(map_config_to_data.keys()))
+  for task in POSSIBLE_TASKS:
+    y = []
+    for noise in x:
+      #print(noise)
+      a1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(noise)]
+      b1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(noise)]
+      c1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(noise)]
+      d1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(noise)]
+      if len(a1)==0:
+        print('yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+noise)
+        assert(False)
+      y.append(entropy(a1,b1,c1,d1))
+    
+    fig, ax = plt.subplots(1)
+    ax.plot(x,y, 'go-', label='entropy', linewidth=2)
+    ax.set_title('Entropy vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/entropy_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def plot_accuracy(map_config_to_data):
+  x = NOISE_LEVEL
+  #print(sorted(map_config_to_data.keys()))
+  for task in POSSIBLE_TASKS:
+    y = []
+    for noise in x:
+      #print(noise)
+      mask1=map_config_to_data['yi6bchatnormal5shot'+task+'mask'+str(noise)]
+
+      if len(mask1)==0:
+        print('yi6bchatnormal5shot'+task+'mask'+noise)
+        assert(False)
+      y.append(np.mean(mask1))
+    
+    fig, ax = plt.subplots(1)
+    ax.plot(x,y, 'go-', label='accuracy', linewidth=2)
+    ax.set_title('Accuracy vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/accuracy_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def plot_clearance(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y = []
+    for noise in x:
+      clearance=map_config_to_data['yi6bchatnormal5shot'+task+'clearance'+str(noise)]
+
+      if len(clearance)==0:
+        print('yi6bchatnormal5shot'+task+'clearance'+noise)
+        assert(False)
+      y.append(np.mean(clearance))
+    
+    fig, ax = plt.subplots(1)
+    ax.plot(x,y, 'go-', label='clearance', linewidth=2)
+    ax.set_title('Clearance vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/clearance_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def fraction_of_answers_changed(a1,b1,c1,d1,a2,b2,c2,d2,mask1,mask2):
+  resp1=[]
+  resp2=[]
+  change=0
+  for a,b,c,d in zip(a1,b1,c1,d1):
+    resp1.append((a,b,c,d))
+  for a,b,c,d in zip(a2,b2,c2,d2):
+    resp2.append((a,b,c,d))
+  for x,y in zip(resp1,resp2):
+    if np.argmax(x)!=np.argmax(y):
+      change+=1
+  return change*1.0/len(a1)
+
+def fraction_flips(a1,b1,c1,d1,a2,b2,c2,d2,mask1,mask2):
+  resp1=[]
+  resp2=[]
+  change=0
+  for a,b,c,d in zip(a1,b1,c1,d1):
+    resp1.append((a,b,c,d))
+  for a,b,c,d in zip(a2,b2,c2,d2):
+    resp2.append((a,b,c,d))
+  for x,y,m1,m2 in zip(resp1,resp2,mask1,mask2):
+    if np.argmax(x)!=np.argmax(y):
+      if m1==1 or m2==1:
+        change+=1
+  return change*1.0/len(a1)
+
+def kldiv(a1,b1,c1,d1,a2,b2,c2,d2):
+  resp1=[]
+  resp2=[]
+  kl=0
+  for a_1,b_1,c_1,d_1,a_2,b_2,c_2,d_2 in zip(a1,b1,c1,d1,a2,b2,c2,d2):
+    kl+= -a_1*np.log(a_2/a_1)-b_1*np.log(b_2/b_1)-c_1*np.log(c_2/c_1)-d_1*np.log(d_2/d_1)
+  
+  return kl*1.0/len(a1)
+
+
+def plot_fraction_of_answers_changed(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y = []
+    for noise in x:
+      a1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(16.0)]
+      b1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(16.0)]
+      c1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(16.0)]
+      d1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(16.0)]
+      a2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(noise)]
+      b2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(noise)]
+      c2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(noise)]
+      d2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(noise)]
+      mask1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(16.0)]
+      mask2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(noise)]
+      if len(a1)==0 or len(a2)==0:
+        print('yi6bchatnormal5shot'+task+'clearance'+noise)
+        assert(False)
+      y.append(fraction_of_answers_changed(a1=a1,b1=b1,c1=c1,d1=d1,a2=a2,b2=b2,c2=c2,d2=d2,mask1=mask1,mask2=mask2))
+    
+    fig, ax = plt.subplots(1)
+    ax.plot(x,y, 'go-', label='Fraction of answers changed', linewidth=2)
+    ax.set_title('Fraction of answers changed vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/Fraction_of_answers_changed_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def fraction_flips(a1,b1,c1,d1,a2,b2,c2,d2,mask1,mask2):
+  resp1=[]
+  resp2=[]
+  change=0
+  for a,b,c,d in zip(a1,b1,c1,d1):
+    resp1.append((a,b,c,d))
+  for a,b,c,d in zip(a2,b2,c2,d2):
+    resp2.append((a,b,c,d))
+  for x,y,m1,m2 in zip(resp1,resp2,mask1,mask2):
+    if np.argmax(x)!=np.argmax(y):
+      if m1==1 or m2==1:
+        change+=1
+  return change*1.0/len(a1)
+
+def plot_accuracy_vs_actual_changes(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y1 = []
+    y2 = []
+    for noise in x:
+      a1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(16.0)]
+      b1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(16.0)]
+      c1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(16.0)]
+      d1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(16.0)]
+      a2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(noise)]
+      b2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(noise)]
+      c2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(noise)]
+      d2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(noise)]
+      mask1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(16.0)]
+      mask2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(noise)]
+      if len(a1)==0 or len(a2)==0:
+        print('yi6bchatnormal5shot'+task+'clearance'+noise)
+        assert(False)
+      y1.append(fraction_of_answers_changed(a1=a1,b1=b1,c1=c1,d1=d1,a2=a2,b2=b2,c2=c2,d2=d2,mask1=mask1,mask2=mask2))
+      y2.append(np.mean(mask1)-np.mean(mask2))
+    
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='Fraction of answers changed', linewidth=2)
+    ax.plot(fpx,y2, 'bo-', label='Accuracy difference', linewidth=2)
+    ax.fill_betweenx([min(np.min(y1),np.min(y2))], 4.5, 6.5, color='red', alpha=0.3)
+    plt.legend()
+    ax.set_title('accuracy  vs actual changes vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/Fraction_of_answers_changed_vs_accuracy_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='Fraction of answers changed', linewidth=2)
+    ax.set_yscale('log')
+    ax.plot(fpx,y2, 'bo-', label='Accuracy difference', linewidth=2)
+    ax.fill_betweenx([min(np.min(y1),np.min(y2))], 4.5, 6.5, color='red', alpha=0.3)
+    plt.legend()
+    ax.set_title('LOG accuracy  vs actual changes vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/LOG Fraction_of_answers_changed_vs_accuracy_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+
+def plot_fraction_flips(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y1 = []
+    y2 = []
+    for noise in x:
+      a1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(16.0)]
+      b1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(16.0)]
+      c1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(16.0)]
+      d1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(16.0)]
+      a2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(noise)]
+      b2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(noise)]
+      c2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(noise)]
+      d2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(noise)]
+      mask1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(16.0)]
+      mask2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(noise)]
+      if len(a1)==0 or len(a2)==0:
+        print('yi6bchatnormal5shot'+task+'a_likelihood'+noise)
+        assert(False)
+      y1.append(fraction_flips(a1=a1,b1=b1,c1=c1,d1=d1,a2=a2,b2=b2,c2=c2,d2=d2,mask1=mask1,mask2=mask2))
+
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='Fraction flips', linewidth=2)
+    #ax.set_yscale('log')
+    plt.legend()
+    ax.set_title('fraction flips vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/Fraction_flips_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+
+def plot_kl_divergence(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y1 = []
+    for noise in x:
+      a1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(16.0)]
+      b1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(16.0)]
+      c1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(16.0)]
+      d1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(16.0)]
+      a2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(noise)]
+      b2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(noise)]
+      c2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(noise)]
+      d2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(noise)]
+      mask1=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(16.0)]
+      mask2=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['_mask']+str(noise)]
+      if len(a1)==0 or len(a2)==0:
+        print('yi6bchatnormal5shot'+task+'a_likelihood'+noise)
+        assert(False)
+      y1.append(kldiv(a1=a1,b1=b1,c1=c1,d1=d1,a2=a2,b2=b2,c2=c2,d2=d2))
+
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='KL Divergence', linewidth=2)
+    #ax.set_yscale('log')
+    plt.legend()
+    ax.set_title('KL Div vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/KL_Div_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def plot_top_margin(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y1 = []
+    for noise in x:
+      top_margin=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['top_margin']+str(noise)]
+      if len(top_margin)==0:
+        print('yi6bchatnormal5shot'+task+'top_margin'+noise)
+        assert(False)
+      y1.append(np.mean(top_margin))
+
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='Top Margin', linewidth=2)
+    #ax.set_yscale('log')
+    plt.legend()
+    ax.set_title('Top Margin vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/Top_Margin_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def plot_best_likelihood(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y1 = []
+    for noise in x:
+      best_likelihood=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['best_likelihoods']+str(noise)]
+      if len(best_likelihood)==0:
+        print('yi6bchatnormal5shot'+task+'best_likelihood'+noise)
+        assert(False)
+      y1.append(np.mean(best_likelihood))
+
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='Best Likelihood', linewidth=2)
+    #ax.set_yscale('log')
+    plt.legend()
+    ax.set_title('Best Likelihood vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/Best_Likelihood_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def plot_ground_truth_likelihood(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y1 = []
+    for noise in x:
+      ground_truth_likelihood=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['correct_likelihoods']+str(noise)]
+      if len(ground_truth_likelihood)==0:
+        print('yi6bchatnormal5shot'+task+'ground truth likelihood'+noise)
+        assert(False)
+      y1.append(np.mean(ground_truth_likelihood))
+
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='Ground Truth Likelihood', linewidth=2)
+    #ax.set_yscale('log')
+    plt.legend()
+    ax.set_title('Ground Truth Likelihood vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/Ground_Truth_Likelihood_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+def plot_option_likelihood(map_config_to_data):
+  x = NOISE_LEVEL
+  for task in POSSIBLE_TASKS:
+    y1 = []
+    y2 = []
+    y3 = []
+    y4 = []
+    for noise in x:
+      a_likelihood=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['a_likelihoods']+str(noise)]
+      b_likelihood=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['b_likelihoods']+str(noise)]
+      c_likelihood=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['c_likelihoods']+str(noise)]
+      d_likelihood=map_config_to_data['yi6bchatnormal5shot'+task+ARTIFACT_TO_ENGLISH['d_likelihoods']+str(noise)]
+      if len(a_likelihood)==0:
+        print('yi6bchatnormal5shot'+task+'a_likelihood'+noise)
+        assert(False)
+      y1.append(np.mean(a_likelihood))
+      y2.append(np.mean(b_likelihood))
+      y3.append(np.mean(c_likelihood))
+      y4.append(np.mean(d_likelihood))
+
+    fig, ax = plt.subplots(1)
+    fpx = [float(i) for i in x]
+    ax.plot(fpx,y1, 'go-', label='A Option Likelihood', linewidth=2)
+    ax.plot(fpx,y2, 'bo-', label='B Option Likelihood', linewidth=2)
+    ax.plot(fpx,y3, 'ro-', label='C Option Likelihood', linewidth=2)
+    ax.plot(fpx,y4, 'yo-', label='D Option Likelihood', linewidth=2)
+    #ax.set_yscale('log')
+    plt.legend()
+    ax.set_title('Option Likelihood vs Noise for '+task+' '+'yi-6b-chat')
+    fig.savefig('./hostvm/images/Option_Likelihood_vs_noise_'+task+'.png')   # save the figure to file
+    plt.close(fig)
+
+
+NOISE_LEVEL=['3.5', '4.0', '4.5', '5.0', '5.5', '6.0', '6.5', '7.0', '7.5', '8.0', '9.0', '10.0', '11.0', '12.0', '13.0', '14.0', '15.0','16.0']
+def analyze_variation_wrt_noise():
+  metrics=['entropy','accuracy','clearance','number of answers changed','flips','top_margin','best likelihood','ground truth likelihood']
+
+  map_config_to_data = get_map_config_to_data_noisy('./hostvm/logs_noisy/')
+  #plot_entropy(map_config_to_data)
+  #plot_accuracy(map_config_to_data)
+  #plot_clearance(map_config_to_data)
+  #plot_fraction_of_answers_changed(map_config_to_data)
+  #plot_accuracy_vs_actual_changes(map_config_to_data)
+
+
+  #plot_fraction_flips(map_config_to_data)
+  #plot_kl_divergence(map_config_to_data)
+  #plot_top_margin(map_config_to_data)
+  #plot_best_likelihood(map_config_to_data)
+  #plot_ground_truth_likelihood(map_config_to_data)
+  #plot_option_likelihood(map_config_to_data)
+
+#breakpoint()
+#analyze_variation_wrt_noise()
+  
