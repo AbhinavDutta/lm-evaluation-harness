@@ -13,7 +13,10 @@ import numpy as np
 import transformers
 import sys, os
 sys.path.append('/code/tensorrt_llm/examples')
-#from run import helper_v1
+try:
+    from run import helper_v1
+except ModuleNotFoundError:
+    pass
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 import io
@@ -39,6 +42,8 @@ def simple_evaluate(
     artifacts=False,
     engine_dir=None,
     tokenizer_dir=None,
+    artifacts_2options=False,
+    logdir=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -78,39 +83,39 @@ def simple_evaluate(
     np.random.seed(1234)
     assert tasks != [], "No tasks specified"
     lm = None
-
     
-    if isinstance(model, str):
-        if model_args is None:
-            model_args = ""
-        lm = lm_eval.models.get_model(model).create_from_arg_string(
-            model_args,
-            {
-                "batch_size": batch_size,
-                "max_batch_size": max_batch_size,
-                "device": device,
-            },
-        )
-    elif isinstance(model, transformers.PreTrainedModel):
-        lm = lm_eval.models.get_model("hf-causal")(
-            pretrained=model,
-            batch_size=batch_size,
-            max_batch_size=max_batch_size,
-        )
-        no_cache = True
-    else:
-        assert isinstance(model, lm_eval.base.LM)
-        lm = model
+    if engine_dir is None:
+        if isinstance(model, str):
+            if model_args is None:
+                model_args = ""
+            lm = lm_eval.models.get_model(model).create_from_arg_string(
+                model_args,
+                {
+                    "batch_size": batch_size,
+                    "max_batch_size": max_batch_size,
+                    "device": device,
+                },
+            )
+        elif isinstance(model, transformers.PreTrainedModel):
+            lm = lm_eval.models.get_model("hf-causal")(
+                pretrained=model,
+                batch_size=batch_size,
+                max_batch_size=max_batch_size,
+            )
+            no_cache = True
+        else:
+            assert isinstance(model, lm_eval.base.LM)
+            lm = model
 
-    if not no_cache:
-        lm = lm_eval.base.CachingLM(
-            lm,
-            "lm_cache/"
-            + (model if isinstance(model, str) else model.model.config._name_or_path)
-            + "_"
-            + model_args.replace("=", "-").replace(",", "_").replace("/", "-")
-            + ".db",
-        )
+        if not no_cache:
+            lm = lm_eval.base.CachingLM(
+                lm,
+                "lm_cache/"
+                + (model if isinstance(model, str) else model.model.config._name_or_path)
+                + "_"
+                + model_args.replace("=", "-").replace(",", "_").replace("/", "-")
+                + ".db",
+            )
     
 
     task_dict = lm_eval.tasks.get_task_dict(tasks)
@@ -138,16 +143,18 @@ def simple_evaluate(
         batch_size=batch_size,
         engine_dir=engine_dir,
         tokenizer_dir=tokenizer_dir,
+        artifacts_2options=artifacts_2options,
+        logdir=logdir,
     )
 
     # add info about the model and few shot config
-    model_name = engine_dir
-    '''
-    if isinstance(model, str):
-        model_name = model
-    elif isinstance(model, transformers.PreTrainedModel):
-        model_name = "pretrained=" + model.config._name_or_path
-    '''
+    if engine_dir is not None:
+        model_name = engine_dir
+    else:
+        if isinstance(model, str):
+            model_name = model
+        elif isinstance(model, transformers.PreTrainedModel):
+            model_name = "pretrained=" + model.config._name_or_path
     results["config"] = {
         "model": model_name,
         "model_args": model_args,
@@ -186,6 +193,8 @@ def evaluate(
     batch_size=None,
     engine_dir=None,
     tokenizer_dir=None,
+    artifacts_2options=False,
+    logdir=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -231,42 +240,33 @@ def evaluate(
     full_task_name_str=''
     for name, task in task_dict_items:
         full_task_name_str=full_task_name_str+name+'_'
+    file_name=file_name+full_task_name_str+'batch_size_'+str(batch_size)+'_'
 
-    if artifacts:
-        DIR = 'hostvm/logs/'
-        file_name=file_name+full_task_name_str+'batch_size_'+str(batch_size)+'_'
-        correct_exp_loglikelihoods_fname=DIR+file_name+'_correct_likelihoods.txt'
-        correct_exp_loglikelihoods_f=open(correct_exp_loglikelihoods_fname,'w') 
-        a_loglikelihoods_fname=DIR+file_name+'_a_likelihoods.txt'
-        a_loglikelihoods_f=open(a_loglikelihoods_fname,'w')
-        b_loglikelihoods_fname=DIR+file_name+'_b_likelihoods.txt'
-        b_loglikelihoods_f=open(b_loglikelihoods_fname,'w')
-        c_loglikelihoods_fname=DIR+file_name+'_c_likelihoods.txt'
-        c_loglikelihoods_f=open(c_loglikelihoods_fname,'w')
-        d_loglikelihoods_fname=DIR+file_name+'_d_likelihoods.txt'
-        d_loglikelihoods_f=open(d_loglikelihoods_fname,'w')
-        best_likelihoods_fname=DIR+file_name+'_best_likelihoods.txt'
-        best_likelihoods_f=open(best_likelihoods_fname,'w')
-        top_margin_fname=DIR+file_name+'_top_margin.txt'
-        top_margin_f=open(top_margin_fname,'w')
-        top_margin_wrong_fname=DIR+file_name+'_top_margin_wrong.txt'
-        top_margin_wrong_f=open(top_margin_wrong_fname,'w')
-        top_margin_correct_fname=DIR+file_name+'_top_margin_correct.txt'
-        top_margin_correct_f=open(top_margin_correct_fname,'w')
-        best_likelihoods_wrong_fname=DIR+file_name+'_best_likelihoods_wrong.txt'
-        best_likelihoods_wrong_f=open(best_likelihoods_wrong_fname,'w')
-        best_likelihoods_correct_fname=DIR+file_name+'_best_likelihoods_correct.txt'
-        best_likelihoods_correct_f=open(best_likelihoods_correct_fname,'w')
+    if artifacts_2options:
+        DIR=logdir
+        a_normalizedloglikelihoods_fname=DIR+file_name+'_a_loglikelihoods.txt'
+        a_normalizedloglikelihoods_f=open(a_normalizedloglikelihoods_fname,'w')
+        b_normalizedloglikelihoods_fname=DIR+file_name+'_b_loglikelihoods.txt'
+        b_normalizedloglikelihoods_f=open(b_normalizedloglikelihoods_fname,'w')
         mask_fname=DIR+file_name+'_mask.txt'
         mask_f=open(mask_fname,'w')
-        clearance_fname=DIR+file_name+'_clearance.txt'
-        clearance_f=open(clearance_fname,'w')
-        correct_option_length_fname=DIR+file_name+'_correct_option_length.txt'
-        correct_option_length_f=open(correct_option_length_fname,'w')
-        best_option_length_fname=DIR+file_name+'_best_option_length.txt'
-        best_option_length_f=open(best_option_length_fname,'w')
-        best_option_norm_length_fname=DIR+file_name+'_best_option_norm_length.txt'
-        best_option_norm_length_f=open(best_option_norm_length_fname,'w')
+        correct_answer_fname=DIR+file_name+'_correct_answer.txt'
+        correct_answer_f=open(correct_answer_fname,'w')
+
+    if artifacts:
+        DIR = logdir
+        a_normalizedloglikelihoods_fname=DIR+file_name+'_a_loglikelihoods.txt'
+        a_normalizedloglikelihoods_f=open(a_normalizedloglikelihoods_fname,'w')
+        b_normalizedloglikelihoods_fname=DIR+file_name+'_b_loglikelihoods.txt'
+        b_normalizedloglikelihoods_f=open(b_normalizedloglikelihoods_fname,'w')
+        c_normalizedloglikelihoods_fname=DIR+file_name+'_c_loglikelihoods.txt'
+        c_normalizedloglikelihoods_f=open(c_normalizedloglikelihoods_fname,'w')
+        d_normalizedloglikelihoods_fname=DIR+file_name+'_d_loglikelihoods.txt'
+        d_normalizedloglikelihoods_f=open(d_normalizedloglikelihoods_fname,'w')
+        mask_fname=DIR+file_name+'_mask.txt'
+        mask_f=open(mask_fname,'w')
+        correct_answer_fname=DIR+file_name+'_correct_answer.txt'
+        correct_answer_f=open(correct_answer_fname,'w')
 
     results = collections.defaultdict(dict)
     versions = collections.defaultdict(dict)
@@ -330,7 +330,6 @@ def evaluate(
                 doc=doc, num_fewshot=num_fewshot, rnd=rnd, description=description
             )
             reqs = task.construct_requests(doc, ctx)
-
             if write_out:
                 prompt_details.append({"doc_id": doc_id})
 
@@ -377,40 +376,20 @@ def evaluate(
         #       they should end up next to each other.
 
         print("Running", reqtype, "requests")
+        if engine_dir is None:
+            resps = getattr(lm, reqtype)([req.args for req in reqs])
+        else:           
+            str_reqs = []
+            for req in reqs:
+                str_reqs.append((req.args[0],req.args[1].strip()))
+            resps_trt_proper = []
+            resps_trt_proper = helper_v1(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
+            resps_trt = []
+            for r in resps_trt_proper:
+                resps_trt.append((r,None))
         
-        resps = getattr(lm, reqtype)([req.args for req in reqs])
+            resps = resps_trt
         
-        #print(resps)
-        
-        '''
-        str_reqs = []
-        for req in reqs:
-            str_reqs.append((req.args[0],req.args[1].strip()))
-        resps_trt_proper = []
-        resps_trt_proper = helper_v1(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
-        resps_trt = []
-        for r in resps_trt_proper:
-            resps_trt.append((r,None))
-        
-        resps = resps_trt
-        
-        for r1,r2 in zip(resps,resps_trt):
-            print(r1[0],r2[0])
-        diff = []
-
-        for i in range(len(resps)): 
-            #print(str_reqs[0])
-            assert(str_reqs[i][0] == reqs[i].args[0] and str_reqs[i][1] == reqs[i].args[1].strip())
-            #print(resps[i][0],resps_trt[i][0])
-            diff.append(abs(resps[i][0]-resps_trt[i][0]))
-        print('\n\n')
-        #print(diff)
-        print('\n\n')
-        print('mean =',np.mean(diff))
-        print('max =',np.max(diff))
-        resps = resps_trt
-        '''
-
         
         #print('resp - ', resps) #resp -  [(-1.271921992301941, True), (-1.865671992301941, False), (-2.3656721115112305, False), (-2.3500471115112305, False)
         resps = [
@@ -434,46 +413,54 @@ def evaluate(
                     write_out_info[task_name][doc_id]["truth"] = task.doc_to_target(doc)
 
     vals = collections.defaultdict(list)
-    
     # unpack results and sort back in order and return control to Task
     for (task_name, doc_id), requests in process_res_queue.items():
         requests.sort(key=lambda x: x[0]) #[(0, -3.4128050804138184), (1, -2.4284300804138184), (2, -2.0846800804138184), (3, -0.7409300804138184)]
         task = task_dict[task_name]
         doc = docs[(task_name, doc_id)]
-        correct_answers_f=open('hostvm/correct_answers/hendrycksTest-high_school_government_and_politics.txt','a')
-        correct_answers_f.write(doc["choices"][doc["gold"]]+' ')
+        #breakpoint()
+
+        if artifacts_2options:
+            if task_name=='winogrande':
+                doc['choices'] =[doc['option1'],doc['option2']]
+                doc['gold']=int(doc['answer'])-1
+            duplicate_req=copy.deepcopy(requests)
+            duplicate_req.sort(key=lambda x: x[1],reverse=True)
+            best_option = duplicate_req[0][0]
+            
+            #breakpoint()
+            assert(len(requests)==2)
+            completion_len = np.array([float(len(i)) for i in doc["choices"]])
+            a_normalizedloglikelihoods_f.write(str((requests[0][1]*1.0/completion_len[0]))+' ')
+            b_normalizedloglikelihoods_f.write(str((requests[1][1]*1.0/completion_len[1]))+' ')
+            correct_answer_f.write(str(doc["gold"])+' ')
+
+            if best_option == doc["gold"]:
+                mask_f.write('1 ')
+            else:   
+                mask_f.write('0 ')
+
         if artifacts:
             duplicate_req=copy.deepcopy(requests)
             duplicate_req.sort(key=lambda x: x[1],reverse=True)
             best_option = duplicate_req[0][0]
             completion_len = np.array([float(len(i)) for i in doc["choices"]])
             _results= [x[1] for x in requests]
-            best_option_norm = np.argmax(_results / completion_len) 
-            a_loglikelihoods_f.write(str(np.exp(requests[0][1]))+' ')
-            b_loglikelihoods_f.write(str(np.exp(requests[1][1]))+' ')
-            c_loglikelihoods_f.write(str(np.exp(requests[2][1]))+' ')
-            d_loglikelihoods_f.write(str(np.exp(requests[3][1]))+' ')
-            best_likelihoods_f.write(str(np.exp(duplicate_req[0][1]))+' ')
-            top_margin_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
-            correct_option_length_f.write(str(len(doc["choices"][doc["gold"]]))+' ')
-            best_option_length_f.write(str(len(doc["choices"][best_option]))+' ')
-            best_option_norm_length_f.write(str(len(doc["choices"][best_option_norm]))+' ')
-            clearance=0
-            if best_option == doc["gold"]:
-                top_margin_correct_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
-                best_likelihoods_correct_f.write(str(np.exp(duplicate_req[0][1]))+' ')
-                mask_f.write('1 ')
-                clearance=np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1])
-            else:   
-                top_margin_wrong_f.write(str(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[1][1]))+' ')
-                best_likelihoods_wrong_f.write(str(np.exp(duplicate_req[0][1]))+' ')
-                mask_f.write('0 ')
-                clearance=-(np.exp(duplicate_req[0][1])-np.exp(duplicate_req[doc["gold"]][1]))
-         
-            correct_exp_loglikelihoods_f.write(str(np.exp(requests[doc["gold"]][1]))+' ')
-            clearance_f.write(str(clearance)+' ')
+            if len(requests)!=4:
+                print(len(requests))
+            a_normalizedloglikelihoods_f.write(str((requests[0][1]*1.0/completion_len[0]))+' ')
+            b_normalizedloglikelihoods_f.write(str((requests[1][1]*1.0/completion_len[1]))+' ')
+            c_normalizedloglikelihoods_f.write(str((requests[2][1]*1.0/completion_len[2]))+' ')
+            d_normalizedloglikelihoods_f.write(str((requests[3][1]*1.0/completion_len[3]))+' ')
+            correct_answer_f.write(str(doc["gold"])+' ')
 
+            if best_option == doc["gold"]:
+                mask_f.write('1 ')
+            else:   
+                mask_f.write('0 ')
+         
         requests = [x[1] for x in requests]
+        #breakpoint()
         metrics = task.process_results(doc, requests)
         for metric, value in metrics.items():
             vals[(task_name, metric)].append(value)
@@ -525,7 +512,7 @@ def evaluate(
 
         for task_name, _ in task_dict_items:
             with open(
-                output_base_path.joinpath(f"{task_name}_write_out_info.json"),
+                output_base_path.joinpath(f"{file_name}_write_out_info.json"),
                 "w",
                 encoding="utf8",
             ) as fp:

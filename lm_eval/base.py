@@ -283,7 +283,6 @@ class BaseLM(LM):
 
             toks = x[1] + x[2]
             return -len(toks), tuple(toks)
-
         re_ord = utils.Reorderer(requests, _collate)
 
         reordered_requests = re_ord.get_reordered()
@@ -339,6 +338,7 @@ class BaseLM(LM):
                 # cont_toks      4 5 6 7 8 9      [:, -len(continuation_enc):, :self.vocab_size] slice
 
                 # when too long to fit in context, truncate from the left
+                #breakpoint()
                 inp = torch.tensor(
                     (context_enc + continuation_enc)[-(self.max_length + 1) :][:-1],
                     dtype=torch.long,
@@ -369,16 +369,9 @@ class BaseLM(LM):
 
             batched_inps = torch.cat(inps, dim=0)  # [batch, padding_length]
            
-            #print('inps= ',inps,'\n', 'cont_toks_list= ',cont_toks_list,'\n','inplens= ',inplens)
-            #with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA]) as prof:
             multi_logits = F.log_softmax(
                     self._model_call(batched_inps), dim=-1
                 ).cpu()  # [batch, padding_length, vocab]
-            #print(multi_logits.shape)
-            #arr = self._model_call(batched_inps)[0][0][0].item()
-            #print('-------------------',type(arr))
-            #prof.export_chrome_trace("trace_4bit_128batch.json")
-            #exit()
             for (cache_key, _, _), logits, inp, inplen, cont_toks in zip(
                 chunk, multi_logits, inps, inplens, cont_toks_list
             ):
@@ -386,28 +379,24 @@ class BaseLM(LM):
                 contlen = len(cont_toks)
                 inplen = inplen + (logits.shape[0] - padding_length)  # if "virtual tokens" (from prompt tuning) are added, inplen is larger
                 logits = logits[inplen - contlen : inplen].unsqueeze(0)  # [1, seq, vocab]
-                #print(logits.shape)
                 # Check if per-token argmax is exactly equal to continuation
                 
                 greedy_tokens = logits.argmax(dim=-1)
                 cont_toks = torch.tensor(cont_toks, dtype=torch.long).unsqueeze(0)  # [1, seq]
-                #print(cont_toks, greedy_tokens)
                 max_equal = (greedy_tokens == cont_toks).all()
 
                 # Obtain log-probs at the corresponding continuation token indices
                 # last_token_slice = logits[:, -1, :].squeeze(0).tolist()
                 logits = torch.gather(logits, 2, cont_toks.unsqueeze(-1)).squeeze(-1)  # [1, seq]
-                #print(logits.shape)
-                #print()
                 # Answer: (log prob, is-exact-match)
                 answer = (float(logits.sum()), bool(max_equal))
-
+                
                 # partial caching
                 if cache_key is not None:
                     self.cache_hook.add_partial("loglikelihood", cache_key, answer)
 
                 res.append(answer)
-            #print('______________________________')
+        #breakpoint()
         return re_ord.get_original(res)
 
     def greedy_until(self, requests):
@@ -759,7 +748,7 @@ class MultipleChoiceTask(Task):
 
     def process_results(self, doc, results):
         gold = doc["gold"]
-
+        #breakpoint()
         acc = 1.0 if np.argmax(results) == gold else 0.0
         completion_len = np.array([float(len(i)) for i in doc["choices"]])
         acc_norm = 1.0 if np.argmax(results / completion_len) == gold else 0.0

@@ -41,6 +41,8 @@ def parse_args():
     parser.add_argument("--write_out", action="store_true", default=False)
     parser.add_argument("--output_base_path", type=str, default=None)
     parser.add_argument("--artifacts",action="store_true",default=False)
+    parser.add_argument("--artifacts_2options",action="store_true",default=False)
+    parser.add_argument("--logdir",type=str,default=None)
     parser.add_argument("--engine_dir",type=str,default=None)
     parser.add_argument("--tokenizer_dir",type=str,default=None)
 
@@ -87,6 +89,8 @@ def main():
         artifacts=args.artifacts,
         engine_dir=args.engine_dir,
         tokenizer_dir=args.tokenizer_dir,
+        artifacts_2options=args.artifacts_2options,
+        logdir=args.logdir
     )
 
     dumped = json.dumps(results, indent=2)
