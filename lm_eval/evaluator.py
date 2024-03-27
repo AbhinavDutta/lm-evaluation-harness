@@ -12,11 +12,15 @@ import tqdm
 import numpy as np
 import transformers
 import sys, os
+import json
+
 sys.path.append('/code/tensorrt_llm/examples')
+
 try:
-    from run import helper_v1
-except ModuleNotFoundError:
+    from run import helper_v1, helper_v2
+except ModuleNotFoundError or NameError:
     pass
+
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
 import io
@@ -283,6 +287,7 @@ def evaluate(
 
     # TODO: we need unit tests & sanity checks or something to ensure that the return of `validation_docs` is stable
     docs = {}
+    docs_to_dump = []
     write_out_info = {}
 
     docs_for_decontamination = collections.defaultdict(list)
@@ -324,7 +329,6 @@ def evaluate(
                 docs_for_decontamination[(task_name, task_set)].append(
                     task.doc_to_decontamination_query(doc)
                 )
-
             docs[(task_name, doc_id)] = doc
             ctx = task.fewshot_context(
                 doc=doc, num_fewshot=num_fewshot, rnd=rnd, description=description
@@ -355,7 +359,8 @@ def evaluate(
     
         if write_out:
             write_out_info[task_name] = prompt_details
-
+       
+    
     # Compare all tasks/sets at once to ensure a single training set scan
     if decontaminate:
         from lm_eval.decontamination.decontaminate import get_train_overlap
@@ -382,12 +387,11 @@ def evaluate(
             str_reqs = []
             for req in reqs:
                 str_reqs.append((req.args[0],req.args[1].strip()))
-            resps_trt_proper = []
-            resps_trt_proper = helper_v1(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
             resps_trt = []
-            for r in resps_trt_proper:
-                resps_trt.append((r,None))
-        
+            
+            #resps_trt = helper_v1(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
+            resps_trt = helper_v2(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
+           
             resps = resps_trt
         
         
@@ -418,7 +422,6 @@ def evaluate(
         requests.sort(key=lambda x: x[0]) #[(0, -3.4128050804138184), (1, -2.4284300804138184), (2, -2.0846800804138184), (3, -0.7409300804138184)]
         task = task_dict[task_name]
         doc = docs[(task_name, doc_id)]
-        #breakpoint()
 
         if artifacts_2options:
             if task_name=='winogrande':
@@ -428,7 +431,6 @@ def evaluate(
             duplicate_req.sort(key=lambda x: x[1],reverse=True)
             best_option = duplicate_req[0][0]
             
-            #breakpoint()
             assert(len(requests)==2)
             completion_len = np.array([float(len(i)) for i in doc["choices"]])
             a_normalizedloglikelihoods_f.write(str((requests[0][1]*1.0/completion_len[0]))+' ')
@@ -460,7 +462,6 @@ def evaluate(
                 mask_f.write('0 ')
          
         requests = [x[1] for x in requests]
-        #breakpoint()
         metrics = task.process_results(doc, requests)
         for metric, value in metrics.items():
             vals[(task_name, metric)].append(value)
