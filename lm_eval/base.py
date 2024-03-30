@@ -24,7 +24,7 @@ class LM(abc.ABC):
         self.cache_hook = CacheHook(None)
 
     @abstractmethod
-    def loglikelihood(self, requests):
+    def loglikelihood(self, requests, logprob_dump_path=None):
         """Compute log-likelihood of generating a continuation from a context.
         Downstream tasks should attempt to use loglikelihood instead of other
         LM calls whenever possible.
@@ -210,7 +210,7 @@ class BaseLM(LM):
         continuation_enc = whole_enc[context_enc_len:]
         return context_enc, continuation_enc
 
-    def loglikelihood(self, requests):
+    def loglikelihood(self, requests, logprob_dump_path=None):
         new_reqs = []
         for context, continuation in requests:
             if context == "":
@@ -222,8 +222,7 @@ class BaseLM(LM):
                 context_enc, continuation_enc = self._encode_pair(context, continuation)
 
             new_reqs.append(((context, continuation), context_enc, continuation_enc))
-
-        return self._loglikelihood_tokens(new_reqs)
+        return self._loglikelihood_tokens(new_reqs,logprob_dump_path=logprob_dump_path)
 
     def loglikelihood_rolling(self, requests):
         # TODO: Implement caching once we've confirmed the perplexity implementation
@@ -269,7 +268,7 @@ class BaseLM(LM):
 
         return loglikelihoods
 
-    def _loglikelihood_tokens(self, requests, disable_tqdm=False, override_bs=None):
+    def _loglikelihood_tokens(self, requests, disable_tqdm=False, override_bs=None, logprob_dump_path=None):
         # TODO: implement some kind of efficient-request-middleware that lumps together requests with the same context
         res = []
 
@@ -283,11 +282,13 @@ class BaseLM(LM):
 
             toks = x[1] + x[2]
             return -len(toks), tuple(toks)
-        re_ord = utils.Reorderer(requests, _collate)
+        #breakpoint()
+        #re_ord = utils.Reorderer(requests, _collate)
 
-        reordered_requests = re_ord.get_reordered()
+        #reordered_requests = re_ord.get_reordered()
+        reordered_requests = requests
         n_reordered_requests = len(reordered_requests)
-
+        loglikelihoods_reordered = []
         # automatic (variable) batch size detection for vectorization
         # pull longest context sample from request
         def _batch_scheduler(pos):
@@ -378,6 +379,7 @@ class BaseLM(LM):
                 # Slice to original seq length
                 contlen = len(cont_toks)
                 inplen = inplen + (logits.shape[0] - padding_length)  # if "virtual tokens" (from prompt tuning) are added, inplen is larger
+                loglikelihoods_reordered.append(logits[inplen - contlen : inplen].cpu().detach().clone())
                 logits = logits[inplen - contlen : inplen].unsqueeze(0)  # [1, seq, vocab]
                 # Check if per-token argmax is exactly equal to continuation
                 
@@ -397,7 +399,10 @@ class BaseLM(LM):
 
                 res.append(answer)
         #breakpoint()
-        return re_ord.get_original(res)
+        if logprob_dump_path is not None:
+            np.save(logprob_dump_path,np.array(loglikelihoods_reordered,dtype=object))
+        #return re_ord.get_original(res)
+        return res
 
     def greedy_until(self, requests):
         # TODO: implement fully general `until` that handles until that are

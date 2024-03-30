@@ -201,6 +201,7 @@ def select_continuation_from_batch_left_padding(
 
 class Reorderer:
     def __init__(self, arr, fn):
+        breakpoint()
         self.size = len(arr)
         arr = list(enumerate(arr))
         arr = group(arr, lambda x: fn(x[1]))

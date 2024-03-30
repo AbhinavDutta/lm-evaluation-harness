@@ -48,6 +48,7 @@ def simple_evaluate(
     tokenizer_dir=None,
     artifacts_2options=False,
     logdir=None,
+    logprob_dump_path=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -149,6 +150,7 @@ def simple_evaluate(
         tokenizer_dir=tokenizer_dir,
         artifacts_2options=artifacts_2options,
         logdir=logdir,
+        logprob_dump_path=logprob_dump_path,
     )
 
     # add info about the model and few shot config
@@ -199,6 +201,7 @@ def evaluate(
     tokenizer_dir=None,
     artifacts_2options=False,
     logdir=None,
+    logprob_dump_path=None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -330,6 +333,7 @@ def evaluate(
                     task.doc_to_decontamination_query(doc)
                 )
             docs[(task_name, doc_id)] = doc
+            
             ctx = task.fewshot_context(
                 doc=doc, num_fewshot=num_fewshot, rnd=rnd, description=description
             )
@@ -360,7 +364,6 @@ def evaluate(
         if write_out:
             write_out_info[task_name] = prompt_details
        
-    
     # Compare all tasks/sets at once to ensure a single training set scan
     if decontaminate:
         from lm_eval.decontamination.decontaminate import get_train_overlap
@@ -379,10 +382,9 @@ def evaluate(
         #       only in index. We could implement some kind of caching, but that would be more of a band-aid
         #       solution. we could also implement some kind of auto-grouping here;
         #       they should end up next to each other.
-
         print("Running", reqtype, "requests")
         if engine_dir is None:
-            resps = getattr(lm, reqtype)([req.args for req in reqs])
+            resps = getattr(lm, reqtype)([req.args for req in reqs], logprob_dump_path=logprob_dump_path+file_name)
         else:           
             str_reqs = []
             for req in reqs:
@@ -390,7 +392,7 @@ def evaluate(
             resps_trt = []
             
             #resps_trt = helper_v1(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
-            resps_trt = helper_v2(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
+            resps_trt = helper_v2(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir, logprob_dump_path=logprob_dump_path+file_name)
            
             resps = resps_trt
         
@@ -400,7 +402,6 @@ def evaluate(
             x if req.index is None else x[req.index] for x, req in zip(resps, reqs)
         ]
         #print('resp - ', resps)
-
         for resp, (i, task_name, doc, doc_id) in zip(resps, requests_origin[reqtype]):
             process_res_queue[(task_name, doc_id)].append((i, resp))
 
@@ -422,7 +423,7 @@ def evaluate(
         requests.sort(key=lambda x: x[0]) #[(0, -3.4128050804138184), (1, -2.4284300804138184), (2, -2.0846800804138184), (3, -0.7409300804138184)]
         task = task_dict[task_name]
         doc = docs[(task_name, doc_id)]
-
+        
         if artifacts_2options:
             if task_name=='winogrande':
                 doc['choices'] =[doc['option1'],doc['option2']]

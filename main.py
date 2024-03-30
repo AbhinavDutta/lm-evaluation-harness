@@ -45,6 +45,7 @@ def parse_args():
     parser.add_argument("--logdir",type=str,default=None)
     parser.add_argument("--engine_dir",type=str,default=None)
     parser.add_argument("--tokenizer_dir",type=str,default=None)
+    parser.add_argument("--logprob_dump_path",type=str,default=None)
 
     return parser.parse_args()
 
@@ -90,7 +91,8 @@ def main():
         engine_dir=args.engine_dir,
         tokenizer_dir=args.tokenizer_dir,
         artifacts_2options=args.artifacts_2options,
-        logdir=args.logdir
+        logdir=args.logdir,
+        logprob_dump_path=args.logprob_dump_path,
     )
 
     dumped = json.dumps(results, indent=2)
