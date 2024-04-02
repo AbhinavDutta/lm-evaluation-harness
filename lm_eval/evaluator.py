@@ -384,7 +384,10 @@ def evaluate(
         #       they should end up next to each other.
         print("Running", reqtype, "requests")
         if engine_dir is None:
-            resps = getattr(lm, reqtype)([req.args for req in reqs], logprob_dump_path=logprob_dump_path+file_name)
+            if logprob_dump_path is None:
+                resps = getattr(lm, reqtype)([req.args for req in reqs])
+            else:
+                resps = getattr(lm, reqtype)([req.args for req in reqs], logprob_dump_path=logprob_dump_path+file_name)
         else:           
             str_reqs = []
             for req in reqs:
@@ -392,7 +395,10 @@ def evaluate(
             resps_trt = []
             
             #resps_trt = helper_v1(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
-            resps_trt = helper_v2(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir, logprob_dump_path=logprob_dump_path+file_name)
+            if logprob_dump_path is None:
+                resps_trt = helper_v2(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir)
+            else:
+                resps_trt = helper_v2(str_reqs,engine_dir=engine_dir,tokenizer_dir=tokenizer_dir, logprob_dump_path=logprob_dump_path+file_name)
            
             resps = resps_trt
         
